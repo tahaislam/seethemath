@@ -207,7 +207,7 @@ function HomePage({ onSelect }) {
         ))}
       </div>
       <div style={{ textAlign: "center", marginTop: 56, padding: "20px 0", borderTop: `1px solid ${T.border}` }}>
-        <p style={{ fontFamily: T.fontSans, fontSize: 13, color: T.textMuted }}>SeeTheMath is free and open source. Built with care for learners everywhere.</p>
+        <p style={{ fontFamily: T.fontSans, fontSize: 13, color: T.textMuted }}>SeeTheMath is free and open source. Built by Islam Taha for learners everywhere.</p>
       </div>
     </div>
   );
