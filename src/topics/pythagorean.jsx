@@ -47,12 +47,14 @@ function PythagSquares({ a, b, width = 380, height = 380, revealStep = 4 }) {
   const showA = revealStep >= 1;
   const showB = revealStep >= 2;
   const showC = revealStep >= 3;
-  const m = 12; // right-angle marker size
+  const m = Math.min(12, 0.4 * Math.min(a, b) * s); // right-angle marker (capped to the shorter leg)
 
   const areaLabel = (pts, txt, color, leg) => {
-    if (leg * s < 30) return null;
+    const side = leg * s;
     const ctr = center(pts);
-    const fs = Math.min(16, Math.max(9, (leg * s) / 3));
+    // Fit the label inside the square by BOTH height and width (serif glyphs ≈ 0.6em wide).
+    const fs = Math.min(16, side / 3, (side * 0.92) / (txt.length * 0.6));
+    if (fs < 8) return null; // too small to fit legibly — leave the square clean
     return (
       <SvgText x={ctr[0]} y={ctr[1]} textAnchor="middle" alignmentBaseline="central" fill={color} fontSize={fs} fontWeight="700" fontFamily={fontSerif(700)}>
         {txt}
