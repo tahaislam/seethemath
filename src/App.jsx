@@ -170,7 +170,7 @@ function formatFrac(n, d) {
 // ─── Home ───
 const topics = [
   { id: "fractions", icon: "◔", title: "Fractions", desc: "Area models and number lines for multiplying fractions — two visual models, one concept", color: T.accent, lightColor: T.accentLight, modules: ["Integer × Fraction", "Fraction × Fraction", "Mixed × Fraction", "Mixed × Mixed", "Number Line View"] },
-  { id: "decimals", icon: "◒", title: "Decimals & Percents", desc: "See the connection between fractions, decimals, and percentages visually", color: T.blue, lightColor: T.blueLight, modules: ["Decimal place value", "Fraction → Decimal", "Percentage of a number"] },
+  { id: "decimals", icon: "◒", title: "Decimals & Percents", desc: "From hundreds grids to real-world tax brackets — see percentages everywhere", color: T.blue, lightColor: T.blueLight, modules: ["Decimal place value", "Fraction → Decimal", "Percentage of a number", "Real World: Tax Brackets"] },
   { id: "ratios", icon: "⇌", title: "Ratios & Proportions", desc: "Tape diagrams and double number lines to see proportional relationships", color: T.orange, lightColor: T.orangeLight, modules: ["What is a ratio?", "Equivalent ratios", "Solving proportions"] },
   { id: "dilations", icon: "◇", title: "Dilations", desc: "Watch shapes grow and shrink around a center point with scale factors", color: T.coral, lightColor: T.coralLight, modules: ["Scale factor > 1", "Scale factor < 1", "Try your own dilation"] },
 ];
@@ -659,10 +659,47 @@ const decExamples = [
     steps: ["40% means 40 out of every 100, or 0.40.", "Think of a bar: the full bar is 60 units.", "40% of the bar = 0.40 × 60 = 24 units.", "On the hundred grid: shade 40 squares → 40% of one whole.", "Result: 40% of 60 = 24"] },
 ];
 
+// 2026 tax brackets — Canada Federal & Ontario Provincial
+// Source: CRA + Ontario Ministry of Finance, indexed Jan 1 2026
+const FED_BRACKETS_2026 = [
+  { upTo: 58523, rate: 0.14 },
+  { upTo: 117045, rate: 0.205 },
+  { upTo: 181440, rate: 0.26 },
+  { upTo: 258482, rate: 0.29 },
+  { upTo: Infinity, rate: 0.33 },
+];
+const ON_BRACKETS_2026 = [
+  { upTo: 53891, rate: 0.0505 },
+  { upTo: 107785, rate: 0.0915 },
+  { upTo: 150000, rate: 0.1116 },
+  { upTo: 220000, rate: 0.1216 },
+  { upTo: Infinity, rate: 0.1316 },
+];
+
+function computeBrackets(income, brackets) {
+  const segments = [];
+  let prev = 0;
+  let totalTax = 0;
+  for (let i = 0; i < brackets.length; i++) {
+    const b = brackets[i];
+    const segStart = prev;
+    const segEnd = b.upTo === Infinity ? income : Math.min(b.upTo, income);
+    if (segEnd <= segStart) break;
+    const amount = segEnd - segStart;
+    const tax = amount * b.rate;
+    totalTax += tax;
+    segments.push({ bracketIdx: i, start: segStart, end: segEnd, amount, rate: b.rate, tax });
+    prev = b.upTo;
+    if (segEnd >= income) break;
+  }
+  return { segments, totalTax };
+}
+
+
 function DecimalsModule() {
+  const [mode, setMode] = useState("guided"); // "guided", "tryit", or "tax"
   const [idx, setIdx] = useState(0);
   const [step, setStep] = useState(0);
-  const [tryMode, setTryMode] = useState(false);
   const [tryPct, setTryPct] = useState(45);
   const [tryNum, setTryNum] = useState(200);
   const ex = decExamples[idx];
@@ -676,11 +713,13 @@ function DecimalsModule() {
 
   return (
     <ModuleShell tag="Decimals & Percents" tagColor={T.blue} title="Hundreds Grid & Bar Models" subtitle="Every decimal, fraction, and percentage is just a different way to say the same number.">
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-        <Chip active={!tryMode} onClick={() => setTryMode(false)} color={T.blue}>Guided Examples</Chip>
-        <Chip active={tryMode} onClick={() => setTryMode(true)} color={T.purple}>Try It Yourself</Chip>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        <Chip active={mode === "guided"} onClick={() => setMode("guided")} color={T.blue}>Guided Examples</Chip>
+        <Chip active={mode === "tryit"} onClick={() => setMode("tryit")} color={T.purple}>Try It Yourself</Chip>
+        <Chip active={mode === "tax"} onClick={() => setMode("tax")} color={T.orange}>Real World: Tax Brackets</Chip>
       </div>
-      {!tryMode ? (
+
+      {mode === "guided" && (
         <>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
             {decExamples.map((e, i) => <Chip key={i} active={idx === i} onClick={() => { setIdx(i); setStep(0); }} color={T.blue}>{e.tab}</Chip>)}
@@ -696,7 +735,9 @@ function DecimalsModule() {
             <StepWalkthrough steps={ex.steps} step={step} setStep={setStep} color={T.blue} />
           </div>
         </>
-      ) : (
+      )}
+
+      {mode === "tryit" && (
         <div style={{ background: T.card, border: `1.5px solid ${T.border}`, borderRadius: 14, padding: "28px 24px", boxShadow: T.shadow }}>
           <h3 style={{ fontFamily: T.font, fontSize: 18, fontWeight: 700, margin: "0 0 6px" }}>Explore percentages</h3>
           <p style={{ fontFamily: T.fontSans, fontSize: 13.5, color: T.textMid, margin: "0 0 20px" }}>Pick a percentage and a number. See both the grid and bar update.</p>
@@ -718,7 +759,432 @@ function DecimalsModule() {
           </div>
         </div>
       )}
+
+      {mode === "tax" && (
+        <TaxFlowView />
+      )}
     </ModuleShell>
+  );
+}
+
+// ─── Tax Flow Visualization ───
+// Shows income flowing through brackets one at a time, each split into tax (red) + take-home (green)
+
+const TAX_INCOME_BLUE = "#3066be";
+const TAX_TAX_RED = "#c74d52";
+const TAX_NET_GREEN = "#2d8659";
+
+function TaxFlowView() {
+  const INCOME = 75000;
+  const fed = computeBrackets(INCOME, FED_BRACKETS_2026);
+  const on = computeBrackets(INCOME, ON_BRACKETS_2026);
+
+  // Build a unified processing sequence:
+  // step 0: intro — just show income bar
+  // steps 1..fed.length: process federal bracket i (split slice into tax+net)
+  // step fed.length + 1: header transition — start ontario
+  // steps fed.length+2..fed.length+1+on.length: process ontario brackets
+  // final step: combine totals into single bar
+  const fedCount = fed.segments.length;
+  const onCount = on.segments.length;
+  const TOTAL_STEPS = 1 + fedCount + 1 + onCount + 1;
+  // Step indices:
+  // 0 = intro
+  // 1..fedCount = federal bracket processing
+  // fedCount+1 = ontario intro
+  // fedCount+2..fedCount+1+onCount = ontario bracket processing
+  // fedCount+2+onCount = final summary
+
+  const [step, setStep] = useState(0);
+
+  const stepLabels = [
+    "Sara earns $75,000 in Ontario. We'll split her income through tax brackets, one slice at a time.",
+    ...fed.segments.map((s, i) => {
+      const sliceLabel = s.amount === INCOME ? `all $${INCOME.toLocaleString()}` : `the $${Math.round(s.amount).toLocaleString()} slice from $${Math.round(s.start).toLocaleString()}–$${Math.round(s.end).toLocaleString()}`;
+      return `Federal bracket ${i + 1}: ${sliceLabel} is taxed at ${(s.rate * 100).toFixed(s.rate < 0.1 ? 2 : 1)}%. Tax = $${Math.round(s.tax).toLocaleString()}. The rest is take-home. Notice: most of the slice is still GREEN.`;
+    }),
+    `Federal done. Total federal tax: $${Math.round(fed.totalTax).toLocaleString()}. Now Ontario applies its own brackets to the same income.`,
+    ...on.segments.map((s, i) => {
+      const sliceLabel = s.amount === INCOME ? `all $${INCOME.toLocaleString()}` : `the $${Math.round(s.amount).toLocaleString()} slice from $${Math.round(s.start).toLocaleString()}–$${Math.round(s.end).toLocaleString()}`;
+      return `Ontario bracket ${i + 1}: ${sliceLabel} is taxed at ${(s.rate * 100).toFixed(2)}%. Tax = $${Math.round(s.tax).toLocaleString()}.`;
+    }),
+    `Final view: combine everything back. Total tax (red) = $${Math.round(fed.totalTax + on.totalTax).toLocaleString()}. Take-home (green) = $${Math.round(INCOME - fed.totalTax - on.totalTax).toLocaleString()}. Effective rate: ${((fed.totalTax + on.totalTax) / INCOME * 100).toFixed(1)}%.`,
+  ];
+
+  // Layout
+  const W = 460;
+  const padX = 20;
+  const barW = W - padX * 2;
+  const barH = 38;
+  const rowGap = 18;
+  // We'll need vertical space for: top income bar + (federal label + brackets) + (ontario label + brackets) + final
+  // For simplicity, render N bars stacked.
+
+  // Determine what to render at this step
+  const isIntro = step === 0;
+  const isFedPhase = step >= 1 && step <= fedCount;
+  const isFedDone = step === fedCount + 1;
+  const isOnPhase = step >= fedCount + 2 && step <= fedCount + 1 + onCount;
+  const isFinal = step === fedCount + 2 + onCount;
+
+  const fedSegsProcessed = isIntro ? 0 : isFedPhase ? step : fedCount;
+  const onSegsProcessed = isOnPhase ? step - (fedCount + 1) : (step > fedCount + 1 + onCount ? onCount : 0);
+
+  // Build the rows we want to render
+  const rows = [];
+
+  // ROW 1: The "active income" bar — shrinks as brackets are processed
+  // In intro: full blue
+  // In fed phase: blue minus what's been processed, with a glow on the currently active slice
+  // After fed: same logic carries to on phase
+  if (!isFinal) {
+    const processedSoFar = fedSegsProcessed > 0
+      ? fed.segments.slice(0, fedSegsProcessed).reduce((s, x) => s + x.amount, 0)
+      : 0;
+    // For the income bar shown at the top, we always show the full income, but highlight what's been "consumed"
+    // Approach: full bar with processed portion in lighter blue (faded) and remaining in bright blue
+    rows.push({ type: "income-active", processedSoFar, currentBracketIdx: isFedPhase ? step - 1 : null });
+  }
+
+  // Federal processed brackets — show as small split bars (red+green)
+  for (let i = 0; i < fedSegsProcessed; i++) {
+    const seg = fed.segments[i];
+    const isCurrent = isFedPhase && i === step - 1;
+    rows.push({ type: "processed", side: "fed", segIdx: i, seg, isCurrent });
+  }
+
+  // Federal label + done indicator
+  if (isFedDone || isOnPhase || isFinal) {
+    if (!isFinal) {
+      rows.push({ type: "phase-label", text: `Federal subtotal: $${Math.round(fed.totalTax).toLocaleString()} tax`, color: T.blue });
+    }
+  }
+
+  // Ontario processed brackets
+  for (let i = 0; i < onSegsProcessed; i++) {
+    const seg = on.segments[i];
+    const isCurrent = isOnPhase && i === step - (fedCount + 2);
+    rows.push({ type: "processed", side: "on", segIdx: i, seg, isCurrent });
+  }
+
+  if (isFinal) {
+    rows.push({ type: "ontario-subtotal", text: `Ontario subtotal: $${Math.round(on.totalTax).toLocaleString()} tax`, color: T.orange });
+    rows.push({ type: "final-summary" });
+  } else if (isOnPhase && onSegsProcessed > 0) {
+    // Show ontario subtotal once any on segs processed (cumulative)
+    // (we don't add a label until phase done)
+  }
+
+  // Compute total height
+  const headerH = 30;
+  const incomeBarH = 50; // includes its own label
+  const processedRowH = barH + 24;
+  const labelRowH = 22;
+  const finalH = 90;
+
+  let H = 20;
+  rows.forEach(r => {
+    if (r.type === "income-active") H += incomeBarH + rowGap;
+    else if (r.type === "processed") H += processedRowH + 6;
+    else if (r.type === "phase-label") H += labelRowH + 4;
+    else if (r.type === "ontario-subtotal") H += labelRowH + 4;
+    else if (r.type === "final-summary") H += finalH + 10;
+  });
+  H += 20;
+
+  // Render
+  let cursorY = 20;
+
+  return (
+    <div style={{ background: T.card, border: `1.5px solid ${T.border}`, borderRadius: 14, padding: "28px 24px", boxShadow: T.shadow }}>
+      <div style={{
+        display: "inline-block", padding: "3px 10px", background: T.orangeLight,
+        border: `1px solid ${T.orange}33`, borderRadius: 6, marginBottom: 12,
+        fontFamily: T.fontSans, fontSize: 11, fontWeight: 700, color: T.orange,
+        textTransform: "uppercase", letterSpacing: 1,
+      }}>Real World</div>
+      <h3 style={{ fontFamily: T.font, fontSize: 22, fontWeight: 700, margin: "0 0 8px", color: T.text }}>
+        Income through tax brackets
+      </h3>
+      <p style={{ fontFamily: T.fontSans, fontSize: 14, color: T.textMid, lineHeight: 1.55, margin: "0 0 20px" }}>
+        Watch how Sara's $75,000 flows through Canadian and Ontario tax brackets — one slice at a time.
+      </p>
+
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 16, marginBottom: 16, fontFamily: T.fontSans, fontSize: 12, color: T.textMid, flexWrap: "wrap" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 14, height: 14, borderRadius: 3, background: TAX_INCOME_BLUE, opacity: 0.85 }} /> Income
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 14, height: 14, borderRadius: 3, background: TAX_TAX_RED, opacity: 0.85 }} /> Tax
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 14, height: 14, borderRadius: 3, background: TAX_NET_GREEN, opacity: 0.85 }} /> Take-home
+        </span>
+      </div>
+
+      {/* Animated visualization */}
+      <div style={{ background: T.bg, borderRadius: 10, padding: "16px 8px", border: `1px solid ${T.border}`, marginBottom: 18 }}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: W }}>
+          {(() => {
+            const elements = [];
+            let y = 20;
+            rows.forEach((r, idx) => {
+              if (r.type === "income-active") {
+                // Top label
+                elements.push(
+                  <text key={`il-${idx}`} x={padX} y={y - 4} fill={T.textMid} fontSize={11} fontWeight={700} fontFamily={T.fontSans}>
+                    Sara's income
+                  </text>
+                );
+                elements.push(
+                  <text key={`ir-${idx}`} x={padX + barW} y={y - 4} textAnchor="end" fill={T.text} fontSize={12} fontWeight={700} fontFamily={T.font}>
+                    ${INCOME.toLocaleString()}
+                  </text>
+                );
+                // Bar with processed (faded) and remaining (bright)
+                const procPx = (r.processedSoFar / INCOME) * barW;
+                const remainPx = barW - procPx;
+                if (procPx > 0) {
+                  elements.push(<rect key={`pf-${idx}`} x={padX} y={y} width={procPx} height={barH} fill={TAX_INCOME_BLUE} opacity={0.18} />);
+                }
+                if (remainPx > 0) {
+                  elements.push(<rect key={`pr-${idx}`} x={padX + procPx} y={y} width={remainPx} height={barH} fill={TAX_INCOME_BLUE} opacity={0.85} rx={3} />);
+                }
+                // Glow on currently active bracket slice
+                if (r.currentBracketIdx !== null && isFedPhase) {
+                  const seg = fed.segments[r.currentBracketIdx];
+                  const sx = padX + (seg.start / INCOME) * barW;
+                  const sw = (seg.amount / INCOME) * barW;
+                  elements.push(<rect key={`gl-${idx}`} x={sx} y={y - 3} width={sw} height={barH + 6} fill="none" stroke={TAX_TAX_RED} strokeWidth={2.5} rx={4} />);
+                  elements.push(
+                    <text key={`gll-${idx}`} x={sx + sw / 2} y={y + barH + 14} textAnchor="middle"
+                      fill={TAX_TAX_RED} fontSize={10} fontWeight={700} fontFamily={T.fontSans}>
+                      ↓ processing this slice
+                    </text>
+                  );
+                }
+                // Outer border
+                elements.push(<rect key={`ob-${idx}`} x={padX} y={y} width={barW} height={barH} fill="none" stroke={T.textMid} strokeWidth={1} rx={3} />);
+                y += incomeBarH + rowGap;
+              } else if (r.type === "processed") {
+                const seg = r.seg;
+                const ratePct = (seg.rate * 100).toFixed(seg.rate < 0.1 ? 2 : 1);
+                const slicePx = (seg.amount / INCOME) * barW; // each slice scaled to income for spatial consistency
+                const taxPx = slicePx * seg.rate;
+                const netPx = slicePx - taxPx;
+                const startX = padX + (seg.start / INCOME) * barW;
+
+                const opacity = r.isCurrent ? 1 : 0.65;
+                const labelText = `${r.side === "fed" ? "Fed" : "ON"} bracket ${r.segIdx + 1}: ${ratePct}%`;
+
+                // Label
+                elements.push(
+                  <text key={`lbl-${idx}`} x={padX} y={y - 4} fill={r.side === "fed" ? T.blue : T.orange} fontSize={10} fontWeight={700} fontFamily={T.fontSans} opacity={opacity}>
+                    {labelText}
+                  </text>
+                );
+                elements.push(
+                  <text key={`lblr-${idx}`} x={padX + barW} y={y - 4} textAnchor="end" fill={T.textMid} fontSize={10} fontFamily={T.fontSans} opacity={opacity}>
+                    ${Math.round(seg.start).toLocaleString()}–${Math.round(seg.end).toLocaleString()}
+                  </text>
+                );
+                // Tax (red)
+                elements.push(<rect key={`tx-${idx}`} x={startX} y={y} width={taxPx} height={barH} fill={TAX_TAX_RED} opacity={0.85 * opacity} rx={taxPx > 8 ? 3 : 0} />);
+                // Net (green)
+                elements.push(<rect key={`nt-${idx}`} x={startX + taxPx} y={y} width={netPx} height={barH} fill={TAX_NET_GREEN} opacity={0.85 * opacity} rx={3} />);
+                // Inner labels
+                if (taxPx > 40) {
+                  elements.push(
+                    <text key={`txl-${idx}`} x={startX + taxPx / 2} y={y + barH / 2} textAnchor="middle" dominantBaseline="central"
+                      fill="#fff" fontSize={10} fontWeight={700} fontFamily={T.fontSans} opacity={opacity}>
+                      ${Math.round(seg.tax).toLocaleString()}
+                    </text>
+                  );
+                }
+                if (netPx > 50) {
+                  elements.push(
+                    <text key={`ntl-${idx}`} x={startX + taxPx + netPx / 2} y={y + barH / 2} textAnchor="middle" dominantBaseline="central"
+                      fill="#fff" fontSize={10} fontWeight={700} fontFamily={T.fontSans} opacity={opacity}>
+                      ${Math.round(seg.amount - seg.tax).toLocaleString()}
+                    </text>
+                  );
+                }
+                // Border
+                elements.push(<rect key={`pob-${idx}`} x={startX} y={y} width={slicePx} height={barH} fill="none" stroke={r.side === "fed" ? T.blue : T.orange} strokeWidth={r.isCurrent ? 2 : 1} opacity={opacity} rx={3} />);
+
+                y += processedRowH + 6;
+              } else if (r.type === "phase-label" || r.type === "ontario-subtotal") {
+                elements.push(
+                  <text key={`pl-${idx}`} x={padX} y={y + 14} fill={r.color} fontSize={12} fontWeight={700} fontFamily={T.fontSans}>
+                    ✓ {r.text}
+                  </text>
+                );
+                y += labelRowH + 4;
+              } else if (r.type === "final-summary") {
+                // The grand finale — single income bar split into total tax and total take-home
+                const totalTax = fed.totalTax + on.totalTax;
+                const taxPx = (totalTax / INCOME) * barW;
+                const netPx = barW - taxPx;
+                const fedTaxPx = (fed.totalTax / INCOME) * barW;
+                const onTaxPx = (on.totalTax / INCOME) * barW;
+
+                elements.push(
+                  <text key={`fl-${idx}`} x={padX} y={y - 4} fill={T.text} fontSize={12} fontWeight={700} fontFamily={T.font}>
+                    Final: $${INCOME.toLocaleString()} split into tax + take-home
+                  </text>
+                );
+                // Tax portion split into Fed (darker) + Ontario (slightly different shade)
+                elements.push(<rect key={`fft-${idx}`} x={padX} y={y} width={fedTaxPx} height={barH + 12} fill={TAX_TAX_RED} opacity={0.85} rx={4} />);
+                elements.push(<rect key={`fot-${idx}`} x={padX + fedTaxPx} y={y} width={onTaxPx} height={barH + 12} fill={TAX_TAX_RED} opacity={0.6} />);
+                elements.push(<rect key={`fnt-${idx}`} x={padX + taxPx} y={y} width={netPx} height={barH + 12} fill={TAX_NET_GREEN} opacity={0.85} rx={4} />);
+
+                // Inner labels
+                if (fedTaxPx > 50) {
+                  elements.push(
+                    <g key={`fft-l-${idx}`}>
+                      <text x={padX + fedTaxPx / 2} y={y + (barH + 12) / 2 - 5} textAnchor="middle" dominantBaseline="central"
+                        fill="#fff" fontSize={10} fontWeight={700} fontFamily={T.fontSans}>Fed</text>
+                      <text x={padX + fedTaxPx / 2} y={y + (barH + 12) / 2 + 8} textAnchor="middle" dominantBaseline="central"
+                        fill="#fff" fontSize={10} fontWeight={700} fontFamily={T.fontSans}>${Math.round(fed.totalTax).toLocaleString()}</text>
+                    </g>
+                  );
+                }
+                if (onTaxPx > 50) {
+                  elements.push(
+                    <g key={`fot-l-${idx}`}>
+                      <text x={padX + fedTaxPx + onTaxPx / 2} y={y + (barH + 12) / 2 - 5} textAnchor="middle" dominantBaseline="central"
+                        fill="#fff" fontSize={10} fontWeight={700} fontFamily={T.fontSans}>ON</text>
+                      <text x={padX + fedTaxPx + onTaxPx / 2} y={y + (barH + 12) / 2 + 8} textAnchor="middle" dominantBaseline="central"
+                        fill="#fff" fontSize={10} fontWeight={700} fontFamily={T.fontSans}>${Math.round(on.totalTax).toLocaleString()}</text>
+                    </g>
+                  );
+                }
+                if (netPx > 80) {
+                  elements.push(
+                    <g key={`fnt-l-${idx}`}>
+                      <text x={padX + taxPx + netPx / 2} y={y + (barH + 12) / 2 - 5} textAnchor="middle" dominantBaseline="central"
+                        fill="#fff" fontSize={11} fontWeight={700} fontFamily={T.fontSans}>Take-home</text>
+                      <text x={padX + taxPx + netPx / 2} y={y + (barH + 12) / 2 + 9} textAnchor="middle" dominantBaseline="central"
+                        fill="#fff" fontSize={11} fontWeight={700} fontFamily={T.fontSans}>${Math.round(INCOME - totalTax).toLocaleString()}</text>
+                    </g>
+                  );
+                }
+                elements.push(<rect key={`fb-${idx}`} x={padX} y={y} width={barW} height={barH + 12} fill="none" stroke={T.textMid} strokeWidth={1.5} rx={4} />);
+
+                y += finalH + 10;
+              }
+            });
+            return elements;
+          })()}
+        </svg>
+      </div>
+
+      <StepWalkthrough steps={stepLabels} step={step} setStep={setStep} color={T.orange} />
+
+      {/* Try any income — slider section */}
+      <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${T.border}` }}>
+        <h4 style={{ fontFamily: T.font, fontSize: 16, fontWeight: 700, margin: "0 0 4px", color: T.text }}>Try any income</h4>
+        <p style={{ fontFamily: T.fontSans, fontSize: 13, color: T.textMid, margin: "0 0 16px" }}>
+          See the final split for any income level.
+        </p>
+        <TaxTrySlider />
+      </div>
+
+      <div style={{
+        marginTop: 24, padding: "12px 16px", background: "#fff8e8",
+        border: "1px solid #e8d5a8", borderRadius: 8,
+      }}>
+        <p style={{ fontFamily: T.fontSans, fontSize: 11.5, color: "#6b5417", lineHeight: 1.55, margin: 0 }}>
+          <strong>Educational only.</strong> Simplified for learning — does not include CPP, EI, basic personal amount,
+          tax credits, Ontario surtax, or deductions. Real tax filings are more complex. For actual tax filing in Canada,
+          use CRA-approved software or consult a tax professional. Brackets shown are for tax year 2026.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function TaxTrySlider() {
+  const [income, setIncome] = useState(75000);
+  const fed = computeBrackets(income, FED_BRACKETS_2026);
+  const on = computeBrackets(income, ON_BRACKETS_2026);
+  const totalTax = fed.totalTax + on.totalTax;
+  const takeHome = income - totalTax;
+  const effective = (totalTax / income) * 100;
+  const fedMarg = FED_BRACKETS_2026.find(b => income < b.upTo).rate;
+  const onMarg = ON_BRACKETS_2026.find(b => income < b.upTo).rate;
+  const marginal = (fedMarg + onMarg) * 100;
+
+  const W = 460;
+  const padX = 20;
+  const barW = W - padX * 2;
+  const barH = 50;
+  const taxPx = (totalTax / income) * barW;
+  const netPx = barW - taxPx;
+  const fedTaxPx = (fed.totalTax / income) * barW;
+  const onTaxPx = (on.totalTax / income) * barW;
+
+  return (
+    <div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 16, padding: 14, background: T.bg, borderRadius: 10, border: `1px solid ${T.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, width: "100%", maxWidth: 400 }}>
+          <span style={{ fontFamily: T.fontSans, fontSize: 13, fontWeight: 700, color: T.orange, minWidth: 96 }}>${income.toLocaleString()}</span>
+          <input type="range" min={20000} max={300000} step={1000} value={income} onChange={e => setIncome(Number(e.target.value))}
+            style={{ flex: 1, accentColor: T.orange }} />
+        </div>
+      </div>
+
+      <div style={{ background: T.bg, borderRadius: 10, padding: "16px 8px", border: `1px solid ${T.border}`, marginBottom: 16 }}>
+        <svg viewBox={`0 0 ${W} ${barH + 28}`} style={{ width: "100%", maxWidth: W }}>
+          <text x={padX} y={14} fill={T.text} fontSize={11} fontWeight={700} fontFamily={T.fontSans}>Income split</text>
+          <text x={padX + barW} y={14} textAnchor="end" fill={T.text} fontSize={12} fontWeight={700} fontFamily={T.font}>${income.toLocaleString()}</text>
+
+          {fedTaxPx > 0 && <rect x={padX} y={20} width={fedTaxPx} height={barH} fill={TAX_TAX_RED} opacity={0.85} rx={4} />}
+          {onTaxPx > 0 && <rect x={padX + fedTaxPx} y={20} width={onTaxPx} height={barH} fill={TAX_TAX_RED} opacity={0.6} />}
+          {netPx > 0 && <rect x={padX + taxPx} y={20} width={netPx} height={barH} fill={TAX_NET_GREEN} opacity={0.85} rx={4} />}
+
+          {fedTaxPx > 50 && (
+            <g>
+              <text x={padX + fedTaxPx / 2} y={20 + barH / 2 - 4} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={10} fontWeight={700} fontFamily={T.fontSans}>Fed</text>
+              <text x={padX + fedTaxPx / 2} y={20 + barH / 2 + 9} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={10} fontWeight={700} fontFamily={T.fontSans}>${Math.round(fed.totalTax).toLocaleString()}</text>
+            </g>
+          )}
+          {onTaxPx > 50 && (
+            <g>
+              <text x={padX + fedTaxPx + onTaxPx / 2} y={20 + barH / 2 - 4} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={10} fontWeight={700} fontFamily={T.fontSans}>ON</text>
+              <text x={padX + fedTaxPx + onTaxPx / 2} y={20 + barH / 2 + 9} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={10} fontWeight={700} fontFamily={T.fontSans}>${Math.round(on.totalTax).toLocaleString()}</text>
+            </g>
+          )}
+          {netPx > 90 && (
+            <g>
+              <text x={padX + taxPx + netPx / 2} y={20 + barH / 2 - 4} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={11} fontWeight={700} fontFamily={T.fontSans}>Take-home</text>
+              <text x={padX + taxPx + netPx / 2} y={20 + barH / 2 + 10} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={11} fontWeight={700} fontFamily={T.fontSans}>${Math.round(takeHome).toLocaleString()}</text>
+            </g>
+          )}
+          <rect x={padX} y={20} width={barW} height={barH} fill="none" stroke={T.textMid} strokeWidth={1} rx={4} />
+        </svg>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+        <div style={{ padding: "10px 14px", background: T.coralLight, borderRadius: 8, border: `1.5px solid ${T.coral}33` }}>
+          <div style={{ fontFamily: T.fontSans, fontSize: 10, fontWeight: 700, color: T.coral, textTransform: "uppercase", letterSpacing: 1 }}>Total Tax</div>
+          <div style={{ fontFamily: T.font, fontSize: 16, fontWeight: 700, color: T.coral, marginTop: 2 }}>${Math.round(totalTax).toLocaleString()}</div>
+        </div>
+        <div style={{ padding: "10px 14px", background: T.accentLight, borderRadius: 8, border: `1.5px solid ${T.accent}33` }}>
+          <div style={{ fontFamily: T.fontSans, fontSize: 10, fontWeight: 700, color: T.accent, textTransform: "uppercase", letterSpacing: 1 }}>Take-Home</div>
+          <div style={{ fontFamily: T.font, fontSize: 16, fontWeight: 700, color: T.accent, marginTop: 2 }}>${Math.round(takeHome).toLocaleString()}</div>
+        </div>
+        <div style={{ padding: "10px 14px", background: T.blueLight, borderRadius: 8, border: `1.5px solid ${T.blue}33` }}>
+          <div style={{ fontFamily: T.fontSans, fontSize: 10, fontWeight: 700, color: T.blue, textTransform: "uppercase", letterSpacing: 1 }}>Effective</div>
+          <div style={{ fontFamily: T.font, fontSize: 16, fontWeight: 700, color: T.blue, marginTop: 2 }}>{effective.toFixed(1)}%</div>
+        </div>
+        <div style={{ padding: "10px 14px", background: T.purpleLight, borderRadius: 8, border: `1.5px solid ${T.purple}33` }}>
+          <div style={{ fontFamily: T.fontSans, fontSize: 10, fontWeight: 700, color: T.purple, textTransform: "uppercase", letterSpacing: 1 }}>Marginal</div>
+          <div style={{ fontFamily: T.font, fontSize: 16, fontWeight: 700, color: T.purple, marginTop: 2 }}>{marginal.toFixed(2)}%</div>
+        </div>
+      </div>
+    </div>
   );
 }
 
