@@ -7,8 +7,9 @@ import * as fractions from "./fractions";
 import * as decimals from "./decimals";
 import * as ratios from "./ratios";
 import * as dilations from "./dilations";
+import * as pythagorean from "./pythagorean";
 
-export const TOPICS = [fractions, decimals, ratios, dilations].map((m) => ({
+export const TOPICS = [fractions, decimals, ratios, dilations, pythagorean].map((m) => ({
   ...m.meta,
   Module: m.Module,
 }));
