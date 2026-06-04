@@ -1,0 +1,62 @@
+name: Android APK (EAS)
+
+# Builds a sideloadable Android APK in the cloud (Expo EAS) so you can install
+# it on your phone without a local Android toolchain. Trigger it by hand from
+# the Actions tab ("Run workflow"). The run summary will contain a tap-to-install
+# download link for the finished APK.
+#
+# One-time setup required:
+#   1. Create a free Expo account at https://expo.dev
+#   2. Make an access token: https://expo.dev/accounts/[you]/settings/access-tokens
+#   3. Add it to this repo as a secret named EXPO_TOKEN
+#      (Settings → Secrets and variables → Actions → New repository secret)
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile"
+        type: choice
+        default: preview
+        options: [preview, production]
+
+jobs:
+  build-apk:
+    name: eas build -p android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build APK on EAS (cloud)
+        run: eas build --platform android --profile ${{ inputs.profile }} --non-interactive --wait
+
+      - name: Surface the install link
+        if: always()
+        run: |
+          eas build:list --platform android --limit 1 --json --non-interactive > build.json || echo "[]" > build.json
+          URL=$(node -e "try{const b=require('./build.json');const x=b[0]||{};console.log((x.artifacts&&x.artifacts.applicationArchiveUrl)||'')}catch(e){console.log('')}")
+          if [ -n "$URL" ]; then
+            {
+              echo "## 📱 SeeTheMath — Android APK ready"
+              echo ""
+              echo "[**Tap here on your phone to download & install**]($URL)"
+              echo ""
+              echo "On Android you'll be asked to allow installs from this source — accept it, then open the file to install."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "APK: $URL"
+          else
+            echo "Could not resolve the APK URL — check the build log / EXPO_TOKEN secret." >> "$GITHUB_STEP_SUMMARY"
+          fi
