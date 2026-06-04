@@ -279,7 +279,7 @@ function TaxTrySlider() {
       <View style={{ alignItems: "center", gap: 10, marginBottom: 16, padding: 14, backgroundColor: T.bg, borderRadius: 10, borderWidth: 1, borderColor: T.border }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 16, width: "100%", maxWidth: 400 }}>
           <Text style={{ fontFamily: fontSans(700), fontSize: 13, color: T.orange, minWidth: 86 }}>${income.toLocaleString()}</Text>
-          <Slider style={{ flex: 1 }} minimumValue={20000} maximumValue={300000} step={1000} value={income} onValueChange={setIncome} minimumTrackTintColor={T.orange} maximumTrackTintColor={T.border} thumbTintColor={T.orange} />
+          <Slider style={{ flex: 1 }} minimumValue={20000} maximumValue={300000} step={1000} value={income} onValueChange={(v) => setIncome(Math.round(v / 1000) * 1000)} minimumTrackTintColor={T.orange} maximumTrackTintColor={T.border} thumbTintColor={T.orange} />
         </View>
       </View>
 

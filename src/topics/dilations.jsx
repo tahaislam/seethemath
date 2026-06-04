@@ -127,7 +127,7 @@ export function Module() {
           <View style={{ alignItems: "center", gap: 14, marginBottom: 24, padding: 16, backgroundColor: T.bg, borderRadius: 10, borderWidth: 1, borderColor: T.border }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 16, width: "100%", maxWidth: 360 }}>
               <Text style={{ fontFamily: fontSans(700), fontSize: 13, color: T.coral, minWidth: 80 }}>Scale: {actualScale.toFixed(1)}×</Text>
-              <Slider style={{ flex: 1 }} minimumValue={2} maximumValue={30} step={1} value={tryScale} onValueChange={setTryScale} minimumTrackTintColor={T.coral} maximumTrackTintColor={T.border} thumbTintColor={T.coral} />
+              <Slider style={{ flex: 1 }} minimumValue={2} maximumValue={30} step={1} value={tryScale} onValueChange={(v) => setTryScale(Math.round(v))} minimumTrackTintColor={T.coral} maximumTrackTintColor={T.border} thumbTintColor={T.coral} />
             </View>
             <View style={{ flexDirection: "row", gap: 32 }}>
               <Text style={{ fontFamily: fontSans(400), fontSize: 12, color: T.textMuted }}>← shrink</Text>

@@ -1,16 +1,11 @@
 // Generates all PNG app assets from the brand SVGs using sharp.
 // Run: node scripts/gen-icons.mjs
 import sharp from "sharp";
-import { writeFileSync } from "fs";
+import { writeFileSync, readFileSync } from "fs";
 
-const GREEN = "#2d6a4f";
-
-// Full app icon: green rounded square + white sigma.
-const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <rect width="1024" height="1024" rx="224" fill="${GREEN}"/>
-  <text x="512" y="512" font-family="Georgia, 'Times New Roman', serif" font-size="620" font-weight="700"
-        fill="#ffffff" text-anchor="middle" dominant-baseline="central">&#8721;</text>
-</svg>`;
+// Full app icon: the canonical brand mark (green rounded square + white sigma).
+// This is the single source of truth — the variants below are derived from it.
+const iconSvg = readFileSync(new URL("../assets/icon.svg", import.meta.url), "utf8");
 
 // Adaptive-icon foreground: transparent bg, white sigma inset within the safe zone.
 const fgSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
