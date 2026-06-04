@@ -15,10 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.islamtaha.seethemath"
+      "bundleIdentifier": "app.seethemath"
     },
     "android": {
-      "package": "com.islamtaha.seethemath",
+      "package": "app.seethemath",
       "adaptiveIcon": {
         "backgroundColor": "#2d6a4f",
         "foregroundImage": "./assets/android-icon-foreground.png",

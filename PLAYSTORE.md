@@ -10,7 +10,7 @@ educational app that collects no data**, which keeps compliance simple.
 - **Expo account + EAS CLI** — `npm i -g eas-cli`, then `eas login`. EAS builds the
   Android app in the cloud (no Android Studio needed).
 - Confirm the **Android package id** in `app.json` → `android.package`
-  (currently `com.islamtaha.seethemath`). ⚠️ This is **permanent** once published —
+  (currently `app.seethemath`). ⚠️ This is **permanent** once published —
   change it now if you want a different one.
 
 ## 1. Build the Android app bundle
@@ -81,7 +81,7 @@ eas submit -p android   # uploads the latest build to Play (after configuring su
 
 | Item | Value |
 |---|---|
-| Package id | `com.islamtaha.seethemath` |
+| Package id | `app.seethemath` |
 | Signing | Play App Signing (Google-managed) |
 | Data collected | None |
 | Ads / trackers | None |
