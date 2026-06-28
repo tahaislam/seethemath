@@ -1,5 +1,6 @@
 import { ScrollView, View, Text, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { T, fontSerif, fontSans } from "../../src/tokens";
 import { getTopic, TOPICS } from "../../src/topics";
 
@@ -11,13 +12,19 @@ export async function generateStaticParams() {
 export default function TopicScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const topic = getTopic(id);
 
   const goHome = () => (router.canGoBack() ? router.back() : router.replace("/"));
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={{ paddingBottom: 60 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: T.border, backgroundColor: T.card }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: T.bg }}
+      contentContainerStyle={{ paddingBottom: 60 + insets.bottom }}
+      stickyHeaderIndices={[0]}
+    >
+      {/* Header stays pinned and its background fills the status-bar area (insets.top). */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 14 + insets.top, paddingBottom: 14, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: T.border, backgroundColor: T.card }}>
         <Pressable onPress={() => router.replace("/")} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <View style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: T.accent, alignItems: "center", justifyContent: "center" }}>
             <Text style={{ color: "#fff", fontSize: 18, fontFamily: fontSerif(700) }}>∑</Text>
