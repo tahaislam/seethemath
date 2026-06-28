@@ -1,5 +1,6 @@
 import { ScrollView, View, Text, Pressable } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { T, fontSerif, fontSans, STRANDS } from "../src/tokens";
 import { TOPICS } from "../src/topics";
 
@@ -45,10 +46,16 @@ function TopicCard({ topic, onPress }) {
 
 export default function Home() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: T.bg }} contentContainerStyle={{ paddingBottom: 60 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: T.border, backgroundColor: T.card }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: T.bg }}
+      contentContainerStyle={{ paddingBottom: 60 + insets.bottom }}
+      stickyHeaderIndices={[0]}
+    >
+      {/* Header stays pinned and its background fills the status-bar area (insets.top). */}
+      <View style={{ flexDirection: "row", alignItems: "center", paddingTop: 14 + insets.top, paddingBottom: 14, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: T.border, backgroundColor: T.card }}>
         <Logo />
       </View>
 
