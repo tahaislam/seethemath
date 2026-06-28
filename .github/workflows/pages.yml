@@ -1,0 +1,58 @@
+name: Deploy web to GitHub Pages
+
+# Publishes the static web export to GitHub Pages on every push to main.
+# This gives the app a public web URL — and, importantly, a public
+# privacy-policy URL (/privacy) that Google Play requires for submission.
+#
+# One-time setup: repo Settings → Pages → "Build and deployment" →
+# Source: "GitHub Actions". (The first run of this workflow can also enable it.)
+#
+# Served at: https://tahaislam.github.io/seethemath/
+# Privacy policy: https://tahaislam.github.io/seethemath/privacy
+# NOTE: app.json experiments.baseUrl is "/seethemath" so assets resolve under
+# that subpath. If you ever move to a root domain, drop that baseUrl.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; don't cancel an in-progress production deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build static website
+        run: npx expo export -p web
+      - name: Disable Jekyll (serve _expo/ assets as-is)
+        run: touch dist/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
