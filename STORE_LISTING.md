@@ -82,13 +82,15 @@ A fresh start: SeeTheMath is now a fast native app.
 • Works offline.
 ```
 
-## Screenshots (still to capture — 2 to 8 required)
+## Screenshots (2 to 8 required)
 
-Capture on a phone or emulator (`npm start` → Android). Suggested set:
-1. Home screen (topics grouped by strand).
-2. Fractions — the area model mid-reveal.
-3. Decimals — the tax-bracket stepper.
-4. Pythagorean theorem — the three squares with a² + b² = c².
-5. A "Try It Yourself" mode showing the live controls.
+Captured phone screenshots (1080×2340) live in [`assets/screenshots/`](assets/screenshots/):
+
+1. `01-home.jpg` — Home screen, topics grouped by strand.
+2. `02-dilations-guided.jpg` — Dilations guided walkthrough ("Enlarge by ×2").
+3. `03-dilations-try-it.jpg` — Dilations "Try It Yourself" with the live scale slider.
+
+More angles worth capturing if you want a fuller set: the fractions area model mid-reveal,
+the decimals tax-bracket stepper, and the Pythagorean three-squares figure.
 
 Phone screenshots: 16:9 or 9:16, min 1080px on the longest side.
